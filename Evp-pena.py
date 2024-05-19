@@ -1,6 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from qutip import basis, qeye, destroy, mesolve, thermal_dm
+from mayavi import mlab
+from qutip import destroy, thermal_dm
+import time
 
 # Параметры системы
 N = 20  # Размерность пространства состояний
@@ -8,22 +9,32 @@ n_th = 0.5  # Температура
 
 # Операторы рождения и уничтожения
 a = destroy(N)
-n = a.dag() * a
-
-# Гамильтониан
-H = a.dag() * a
 
 # Начальное состояние системы (термодинамическое)
 rho0 = thermal_dm(N, n_th)
 
-# Список временных точек
-tlist = np.linspace(0, 10, 100)
+# Создание сцены Mayavi
+fig = mlab.figure(size=(800, 600))
 
-# Расчет динамики системы
-result = mesolve(H, rho0, tlist, [], [n])
+# Создание трехмерной сетки куба
+x, y, z = np.mgrid[0:10:N*1j, 0:10:N*1j, 0:10:N*1j]
 
-# Визуализация результатов (график)
-plt.plot(tlist, result.expect[0])
-plt.xlabel('Время')
-plt.ylabel('Ожидаемое значение оператора числа')
-plt.show()
+# Создание начального состояния системы
+state = np.abs((a.dag() * a * rho0).tr())  # Ожидаемое значение оператора числа
+
+# Создание объекта-сетки для визуализации
+grid = mlab.pipeline.scalar_field(x, y, z, state)
+mlab.pipeline.volume(grid)
+
+# Функция обновления в реальном времени
+def update_figure():
+    while True:
+        state = np.abs((a.dag() * a * rho0).tr())  # Ожидаемое значение оператора числа
+        grid.mlab_source.scalars = state
+        time.sleep(0.1)
+
+# Запуск функции обновления в реальном времени
+update_figure()
+
+# Отображение сцены
+mlab.show()
