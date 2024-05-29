@@ -1,11 +1,34 @@
+import matplotlib.pyplot as plt
 import numpy as np
+from sympy import symbols
 from mayavi import mlab
 
-def V(x, y, z):
-    return np.cos(10*x)*np.cos(10*y)*np.cos(10*z) + 2*(x**2 + y**2 + z**2)
+x,y,z = symbols('x y z')
+def gradient(f):
+    return (f.diff(x), f.diff(y),f.diff(z))
 
-X, Y, Z = np.mgrid[-2:2:100j, -2:2:100j, -2:2:100j]
+f = x*y**2+z**2
+g = gradient(f)
 
-mlab.contour3d(X, Y, Z, V, contours=10)  # Установите количество контуров
+xrange = np.linspace(-3,3,15)
+yrange = np.linspace(-3,3,15)
+zrange = np.linspace(-3,3,15)
+X,Y,Z = np.meshgrid(xrange, yrange, zrange)
 
-mlab.show() 
+U = np.zeros((15,15,15))
+V = np.zeros((15,15,15))
+W = np.zeros((15,15,15))
+
+for i in range(len(xrange)):
+    for j in range(len(yrange)):
+        for k in range(len(zrange)):
+            x1 = X[i,j,k]
+            y1 = Y[i,j,k]
+            z1 = Z[i,j,k]
+            U[i,j,k] = g[0].subs({x:x1, y:y1, z:z1})
+            V[i,j,k] = g[1].subs({x:x1, y:y1, z:z1})
+            W[i,j,k] = g[2].subs({x:x1, y:y1, z:z1})
+
+
+mlab.quiver3d(X,Y,Z,U,V,W)
+mlab.show()
