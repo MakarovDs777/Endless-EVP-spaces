@@ -40,53 +40,53 @@ update_figure()
 mlab.show()"""
 
 import numpy as np
-from enthought.mayavi import mlab
+from mayavi import mlab
 import random
 
 def V(x, y, z):
     return np.cos(10*x) + np.cos(10*y) + np.cos(10*z) + 2*(x**2 + y**2 + z**2)
 
-# Параметры
-размер_сетки = 100
-шаг_по_времени = 0,1
-размер_флуктуации = 0,2
-амплитуда_флуктуации = 1,0
-время_жизни_флуктуации = 5
+# Parameters
+grid_size = 100
+time_step = 0.1
+fluctuation_size = 0.2
+fluctuation_amplitude = 1.0
+fluctuation_lifetime = 5
 
-# Инициализация
+# инициализация
 X, Y, Z = np.mgrid[-2:2:100j, -2:2:100j, -2:2:100j]
-V = np.zeros((размер_сетки, размер_сетки, размер_сетки))
-время = 0
+V = np.zeros((grid_size, grid_size, grid_size))
+t = 0
 
-# Цикл времени
+# Цикл вечный
 while True:
-    # Сгенерировать случайные флуктуации
-    количество_флуктуаций = random.randint(10, 20)
-    для i в range(количество_флуктуаций):
-        # Выбрать случайную точку
+    # Генерировать случайные флуктуации
+    num_fluctuations = random.randint(10, 20)
+    for i in range(num_fluctuations):
+        # Выберите случайную точку
         x = random.uniform(-2, 2)
         y = random.uniform(-2, 2)
         z = random.uniform(-2, 2)
 
-        # Сгенерировать случайный вектор
-        vx = random.uniform(-амплитуда_флуктуации, амплитуда_флуктуации)
-        vy = random.uniform(-амплитуда_флуктуации, амплитуда_флуктуации)
-        vz = random.uniform(-амплитуда_флуктуации, амплитуда_флуктуации)
+        #Сгенерируйте случайный вектор
+        vx = random.uniform(-fluctuation_amplitude, fluctuation_amplitude)
+        vy = random.uniform(-fluctuation_amplitude, fluctuation_amplitude)
+        vz = random.uniform(-fluctuation_amplitude, fluctuation_amplitude)
         v = np.array([vx, vy, vz])
 
-        # Добавить флуктуацию к векторному полю
-        V[int((x - (-2))/(4/размер_сетки)):int((x - (-2))/(4/размер_сетки)) + размер_флуктуации*размер_сетки,
-          int((y - (-2))/(4/размер_сетки)):int((y - (-2))/(4/размер_сетки)) + размер_флуктуации*размер_сетки,
-          int((z - (-2))/(4/размер_сетки)):int((z - (-2))/(4/размер_сетки)) + размер_флуктуации*размер_сетки] += v
+        # Добавьте флуктуацию к векторному полю
+        V[int((x - (-2))/(4/grid_size)):int((x - (-2))/(4/grid_size)) + int(fluctuation_size*grid_size),
+          int((y - (-2))/(4/grid_size)):int((y - (-2))/(4/grid_size)) + int(fluctuation_size*grid_size),
+          int((z - (-2))/(4/grid_size)):int((z - (-2))/(4/grid_size)) + int(fluctuation_size*grid_size)] += v
 
-    # Размытие
+    # сглаживание
     V = ndimage.gaussian_filter(V, sigma=0.5)
 
-    # Уменьшение флуктуаций
-    V *= np.exp(-время / время_жизни_флуктуации)
+    # Затухание флуктуаций
+    V *= np.exp(-t / fluctuation_lifetime)
 
-    # Обновление времени
-    время += шаг_по_времени
+    # Время обновления
+    t += time_step
 
     # Визуализация
     mlab.contour3d(X, Y, Z, V)
