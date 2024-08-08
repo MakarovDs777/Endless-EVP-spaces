@@ -65,16 +65,30 @@ def draw_foam(verts, faces):
 # Основной цикл
 base = 0
 scale = 10
+x_offset = 0
+z_offset = 0
 clock = pygame.time.Clock()
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             quit()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_w:
+                z_offset += 5
+            if event.key == pygame.K_s:
+                z_offset -= 5
+            if event.key == pygame.K_a:
+                x_offset -= 5
+            if event.key == pygame.K_d:
+                x_offset += 5
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glPushMatrix()
+    glTranslatef(x_offset, 0, z_offset)
     base += 1
     verts, faces = create_foam(base, scale)
     draw_foam(verts, faces)
+    glPopMatrix()
     pygame.display.flip()
     clock.tick(60)
