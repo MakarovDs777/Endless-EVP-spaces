@@ -4,6 +4,7 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 import numpy as np
 import noise
+from skimage import measure
 
 # Инициализация Pygame
 pygame.init()
@@ -29,11 +30,11 @@ def normalize_noise(noise):
 
 # Генерация шума Перлина для одного кадра
 def generate_noise(base, scale):
-    noise = np.zeros(shape)
+    noise_array = np.zeros(shape)
     for i in range(shape[0]):
         for j in range(shape[1]):
             for k in range(shape[2]):
-                noise[i][j][k] = noise.pnoise3(i/scale,
+                noise_array[i][j][k] = noise.pnoise3(i/scale,
                                               j/scale,
                                               k/scale,
                                               octaves=octaves,
@@ -43,39 +44,29 @@ def generate_noise(base, scale):
                                               repeaty=shape[1],
                                               repeatz=shape[2],
                                               base=int(base))
-    return normalize_noise(noise)
+    return normalize_noise(noise_array)
 
-# Создание террейна
-def create_terrain(width, height, x_offset, z_offset, base, scale):
-    noise_map = generate_noise(base, scale)
-    vertices = []
-    for i in range(width):
-        for j in range(height):
-            x = i - width // 2
-            z = j - height // 2
-            y = noise_map[i][j][0] * 10
-            vertices.append((x + x_offset, y, z + z_offset))
-    return vertices
+# Создание квантовой пены
+def create_foam(base, scale):
+    noise_array = generate_noise(base, scale)
+    U = np.where(noise_array > 0.5, noise_array, noise_array.min())
+    U = normalize_noise(U)
+    verts, faces, normals, values = measure.marching_cubes(U, level=0.5)
+    return verts, faces
 
-# Отрисовка террейна
-def draw_terrain(vertices, width, height):
-    glBegin(GL_LINES)
-    for i in range(width):
-        for j in range(height):
-            if i < width - 1:
-                glVertex3fv(vertices[i * height + j])
-                glVertex3fv(vertices[(i + 1) * height + j])
-            if j < height - 1:
-                glVertex3fv(vertices[i * height + j])
-                glVertex3fv(vertices[i * height + j + 1])
+# Отрисовка квантовой пены
+def draw_foam(verts, faces):
+    glBegin(GL_TRIANGLES)
+    for face in faces:
+        for vert in face:
+            glVertex3fv(verts[vert])
     glEnd()
 
 # Основной цикл
-width, height = 32, 32
-x_offset = 0
-z_offset = 0
 base = 0
 scale = 10
+x_offset = 0
+z_offset = 0
 clock = pygame.time.Clock()
 while True:
     for event in pygame.event.get():
@@ -93,8 +84,11 @@ while True:
                 x_offset += 5
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glPushMatrix()
+    glTranslatef(x_offset, 0, z_offset)
     base += 1
-    vertices = create_terrain(width, height, x_offset, z_offset, base, scale)
-    draw_terrain(vertices, width, height)
+    verts, faces = create_foam(base, scale)
+    draw_foam(verts, faces)
+    glPopMatrix()
     pygame.display.flip()
     clock.tick(60)
