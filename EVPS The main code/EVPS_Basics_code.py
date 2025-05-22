@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import numpy as np
-
+import random 
 def load_rgb_data(file_path):
     with open(file_path, 'r') as f:
         lines = f.readlines()
