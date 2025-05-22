@@ -66,7 +66,7 @@ def calc_dispertion(fragments):
 
 def calc_representativity(fragments):
     total = sum(len(frag) for frag in fragments)
-    max_same = max(len(set(frag)) for frag in fragments)
+    max_same = max(len(set(tuple(pixel) for pixel in frag)) for frag in fragments)
     ratio = max_same / total if total > 0 else 0
     return ratio
 
