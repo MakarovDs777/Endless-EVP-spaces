@@ -1,21 +1,22 @@
 import tkinter as tk
 from tkinter import ttk
-import threading
 import numpy as np
 from PIL import Image, ImageTk
-import pygame
-import random
-import time
 from itertools import permutations
 
-pygame.mixer.init()
+# pygame импорт оставлен, но он не обязателен для данной демонстрации
+try:
+    import pygame
+    pygame.mixer.init()
+except Exception:
+    pass
 
 class MyApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Процедурная обработка и волномеризация")
-        
-        # Инициализация переменных
+        self.root.title("Параметры мозаики")
+
+        # Параметры мозаики (по умолчанию)
         self.range_ranges = {
             'Диапазон 1': (0, 255),
             'Диапазон 2': (0, 255),
@@ -27,99 +28,79 @@ class MyApp:
         self.dispersion_type = 'Маленькие'
         self.representativity = 0.5
 
-        # Для волнометрии
-        self.init_wave_params()
-
-        # Создаем вкладки интерфейса
-        self.setup_ui()
-
-        # Для генерации Permutations
+        # Для генерации кадров волнометрии
         self.rgb_permutations = list(permutations(list(range(10)), 3))
         self.current_index = 0
-        self.update_wave_flag = False  # флаг активности волнометрии
+        self.update_wave_flag = False
 
-        # Для видеобара
-        self.setup_video()
+        # Ссылка на окно волнометрии и его виджеты
+        self.wave_window = None
+        self.wave_canvas = None
+        self.btn_stop_wave = None
 
-    def init_wave_params(self):
-        pass
-
-    def setup_ui(self):
-        # Вкладки
-        tab_control = ttk.Notebook(self.root)
-        self.tab_params = ttk.Frame(tab_control)
-        self.tab_wave = ttk.Frame(tab_control)
-        tab_control.add(self.tab_params, text='Параметры Мозаики')
-        tab_control.add(self.tab_wave, text='Волномеризация')
-        tab_control.pack(expand=1, fill='both')
-
-        # Параметры мозаики
-        self.setup_mosaic_params(self.tab_params)
-
-        # Вкладка волнометрии
-        self.setup_wave_view(self.tab_wave)
+        # Собираем интерфейс параметров
+        self.setup_mosaic_params(self.root)
 
     def setup_mosaic_params(self, parent):
-        # Диапазоны случайной генерации
         lbl_ranges = tk.Label(parent, text='Диапазоны случайной генерации:')
-        lbl_ranges.pack()
+        lbl_ranges.pack(pady=(10, 2))
 
         self.range_entries = []
         for key in ['Диапазон 1', 'Диапазон 2', 'Диапазон 3']:
             frame = tk.Frame(parent)
-            frame.pack(pady=2)
+            frame.pack(pady=2, anchor='w')
             lbl = tk.Label(frame, text=key)
-            lbl.pack(side=tk.LEFT)
-            entry_min = tk.Entry(frame, width=5)
-            entry_min.pack(side=tk.LEFT)
-            entry_max = tk.Entry(frame, width=5)
+            lbl.pack(side=tk.LEFT, padx=(0,6))
+            entry_min = tk.Entry(frame, width=6)
+            entry_min.pack(side=tk.LEFT, padx=(0,4))
+            entry_max = tk.Entry(frame, width=6)
             entry_max.pack(side=tk.LEFT)
-            # Значения по умолчанию
             entry_min.insert(0, str(self.range_ranges[key][0]))
             entry_max.insert(0, str(self.range_ranges[key][1]))
             self.range_entries.append((entry_min, entry_max))
-        
-        # Общая повторяемость
+
         lbl_repeat = tk.Label(parent, text='Общая повторяемость (%)')
-        lbl_repeat.pack(pady=2)
-        self.entry_repeat = tk.Entry(parent, width=5)
-        self.entry_repeat.pack()
+        lbl_repeat.pack(pady=(8,2), anchor='w')
+        self.entry_repeat = tk.Entry(parent, width=6)
+        self.entry_repeat.pack(anchor='w')
         self.entry_repeat.insert(0, str(self.repeatability_percent))
 
-        # Количество мозаик
         lbl_fragments = tk.Label(parent, text='Количество мозаик')
-        lbl_fragments.pack(pady=2)
-        self.entry_fragments = tk.Entry(parent, width=5)
-        self.entry_fragments.pack()
+        lbl_fragments.pack(pady=(8,2), anchor='w')
+        self.entry_fragments = tk.Entry(parent, width=6)
+        self.entry_fragments.pack(anchor='w')
         self.entry_fragments.insert(0, str(self.fragment_count))
 
-        # Диапазон повторяемости
-        lbl_repetition_range = tk.Label(parent, text='Диапазон повторяемости')
-        lbl_repetition_range.pack(pady=2)
-        self.entry_repetition_min = tk.Entry(parent, width=5)
-        self.entry_repetition_min.pack()
-        self.entry_repetition_max = tk.Entry(parent, width=5)
-        self.entry_repetition_max.pack()
+        lbl_repetition_range = tk.Label(parent, text='Диапазон повторяемости (min/max)')
+        lbl_repetition_range.pack(pady=(8,2), anchor='w')
+        frame_rep = tk.Frame(parent)
+        frame_rep.pack(anchor='w')
+        self.entry_repetition_min = tk.Entry(frame_rep, width=6)
+        self.entry_repetition_min.pack(side=tk.LEFT, padx=(0,4))
+        self.entry_repetition_max = tk.Entry(frame_rep, width=6)
+        self.entry_repetition_max.pack(side=tk.LEFT)
         self.entry_repetition_min.insert(0, str(self.range_repetition[0]))
         self.entry_repetition_max.insert(0, str(self.range_repetition[1]))
 
-        # Дисперсия
         lbl_dispersion = tk.Label(parent, text='Дисперсия')
-        lbl_dispersion.pack(pady=2)
+        lbl_dispersion.pack(pady=(8,2), anchor='w')
         self.dispersion_var = tk.StringVar(value='Маленькие')
         options = ['Маленькие', 'Средние', 'Большие']
-        ttk.OptionMenu(parent, self.dispersion_var, options[0], *options).pack()
+        ttk.OptionMenu(parent, self.dispersion_var, options[0], *options).pack(anchor='w')
 
-        # Резентативность
         lbl_repre = tk.Label(parent, text='Репрезентативность')
-        lbl_repre.pack(pady=2)
-        self.entry_representativity = tk.Entry(parent, width=5)
-        self.entry_representativity.pack()
+        lbl_repre.pack(pady=(8,2), anchor='w')
+        self.entry_representativity = tk.Entry(parent, width=6)
+        self.entry_representativity.pack(anchor='w')
         self.entry_representativity.insert(0, str(self.representativity))
 
-        # Кнопка сохранить
-        btn_save = tk.Button(parent, text='Сохранить параметры', command=self.save_mosaic_params)
-        btn_save.pack(pady=5)
+        btn_frame = tk.Frame(parent)
+        btn_frame.pack(pady=12)
+        btn_save = tk.Button(btn_frame, text='Сохранить параметры', command=self.save_mosaic_params)
+        btn_save.pack(side=tk.LEFT, padx=6)
+
+        btn_open_wave = tk.Button(btn_frame, text='Открыть Волномер', command=self.open_wave_window)
+        btn_open_wave.pack(side=tk.LEFT, padx=6)
 
     def save_mosaic_params(self):
         try:
@@ -135,62 +116,99 @@ class MyApp:
             self.range_repetition = [range_min, range_max]
             self.dispersion_type = self.dispersion_var.get()
             self.representativity = float(self.entry_representativity.get())
-
             print("Параметры сохранены:", self.range_ranges, self.repeatability_percent,
                   self.fragment_count, self.range_repetition, self.dispersion_type, self.representativity)
         except Exception as e:
             print("Ошибка при сохранении:", e)
 
-    def setup_wave_view(self, parent):
-        # Область для видео
-        self.video_canvas = tk.Canvas(parent, width=640, height=480, bg='black')
-        self.video_canvas.pack(pady=5)
+    def open_wave_window(self):
+        # Если окно уже открыто — просто вывести на передний план
+        if self.wave_window and tk.Toplevel.winfo_exists(self.wave_window):
+            self.wave_window.deiconify()
+            self.wave_window.lift()
+            return
 
-        # Начальная кнопка "Запустить волномер."
-        self.btn_start_wave = tk.Button(parent, text='Запустить волномер.', command=self.toggle_wave)
-        self.btn_start_wave.pack(pady=2)
+        # Создаём Toplevel окно для волнометрии
+        self.wave_window = tk.Toplevel(self.root)
+        self.wave_window.title("Волномеризация")
+        self.wave_window.protocol("WM_DELETE_WINDOW", self.on_wave_close)
 
-        # Создаем отдельную кнопку для остановки - справа
-        self.btn_stop_wave = tk.Button(parent, text='Остановить', command=self.stop_wave)
-        self.btn_stop_wave.pack(pady=2)
-        self.btn_stop_wave.pack_forget()  # изначально скрыт
+        # Канвас для видео
+        self.wave_canvas = tk.Canvas(self.wave_window, width=640, height=480, bg='black')
+        self.wave_canvas.pack(padx=8, pady=8)
 
-    def setup_video(self):
-        self.current_index = 0
+        # Кнопки управления внутри окна волнометрии
+        ctrl_frame = tk.Frame(self.wave_window)
+        ctrl_frame.pack(pady=(0,8))
+        btn_start = tk.Button(ctrl_frame, text='Старт', command=self.start_wave)
+        btn_start.pack(side=tk.LEFT, padx=6)
+        self.btn_stop_wave = tk.Button(ctrl_frame, text='Стоп', command=self.stop_wave)
+        self.btn_stop_wave.pack(side=tk.LEFT, padx=6)
+
+        # Сразу запускаем обновление кадров
+        self.start_wave()
+
+    def start_wave(self):
+        if not self.wave_window or not tk.Toplevel.winfo_exists(self.wave_window):
+            return
+        if not self.update_wave_flag:
+            self.update_wave_flag = True
+            # начальное значение индекса (можно сбрасывать, если нужно)
+            # self.current_index = 0
+            self.schedule_next_frame()
+
+    def stop_wave(self):
+        self.update_wave_flag = False
+
+    def on_wave_close(self):
+        # Останавливаем обновление и закрываем окно
+        self.stop_wave()
+        if self.wave_window:
+            try:
+                self.wave_window.destroy()
+            except Exception:
+                pass
+        self.wave_window = None
+        self.wave_canvas = None
+        self.btn_stop_wave = None
+
+    def schedule_next_frame(self):
+        # Используем after от окна волнометрии если оно существует, иначе от root
+        if self.wave_window and tk.Toplevel.winfo_exists(self.wave_window):
+            self.wave_window.after(30, self.update_video_frame)
+        else:
+            # Если окно закрыто — выключаем флаг
+            self.update_wave_flag = False
 
     def update_video_frame(self):
         if not self.update_wave_flag:
             return
-        # Генерация кадра
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        for y in range(480):
-            for x in range(640):
-                rgb_idx = (y * 640 + x + self.current_index) % len(self.rgb_permutations)
-                frame[y, x] = np.array(self.rgb_permutations[rgb_idx])
+        if not (self.wave_window and tk.Toplevel.winfo_exists(self.wave_window) and self.wave_canvas):
+            # окно было закрыто извне
+            self.update_wave_flag = False
+            return
+
+        # Генерация простого кадра (как в вашем примере)
+        h, w = 480, 640
+        frame = np.zeros((h, w, 3), dtype=np.uint8)
+        total_perm = len(self.rgb_permutations)
+        for y in range(h):
+            for x in range(w):
+                rgb_idx = (y * w + x + self.current_index) % total_perm
+                # permutations дают значения 0..9, оставляем так же как в исходнике
+                frame[y, x] = np.array(self.rgb_permutations[rgb_idx], dtype=np.uint8)
         image = Image.fromarray(frame)
         image_tk = ImageTk.PhotoImage(image)
-        self.video_canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
-        self.video_canvas.image = image_tk
+        self.wave_canvas.create_image(0, 0, anchor=tk.NW, image=image_tk)
+        # сохранить ссылку чтобы изображение не собиралось сборщиком мусора
+        self.wave_canvas.image = image_tk
+
         self.current_index += 1
-        self.root.after(30, self.update_video_frame)
+        # Запланировать следующий кадр
+        self.schedule_next_frame()
 
-    def toggle_wave(self):
-        # Запуск или остановка волномерии
-        if not self.update_wave_flag:
-            self.update_wave_flag = True
-            self.btn_start_wave.pack_forget()  # скрыть кнопку запуска
-            self.btn_stop_wave.pack()         # показать кнопку остановки
-            self.update_video_frame()          # запуск обновления
-        else:
-            self.stop_wave()
-
-    def stop_wave(self):
-        self.update_wave_flag = False
-        self.btn_stop_wave.pack_forget()
-        self.btn_start_wave.pack()  # возвращение фаршинг кнопки старт
-
-# Запуск приложения
 if __name__ == "__main__":
     root = tk.Tk()
     app = MyApp(root)
     root.mainloop()
+
