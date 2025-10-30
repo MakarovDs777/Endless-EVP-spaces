@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw, ImageFilter
 from itertools import permutations
 import time
 import math
@@ -177,7 +177,7 @@ class MyApp:
         self.update_wave_flag = False
 
     def inject_perturbation(self):
-        # добавим запись в историю, чтобы система увидела "шок"
+        # добавим запись в истории, чтобы система увидела "шок"
         self.metric_history['global_mean'].append((time.time(), 'perturb'))
         print("Импульс введён")
 
@@ -425,6 +425,9 @@ class MyApp:
         if not self.update_wave_flag:
             return
 
+        # увеличиваем счётчик кадров — используется для детерминированной генерации декоративных элементов
+        self.current_index += 1
+
         # Генерируем кадр, используя диапазоны и фрагменты
         frame = np.zeros((self.h, self.w, 3), dtype=np.uint8)
 
@@ -437,35 +440,69 @@ class MyApp:
 
         # prepare ranges per mosaic cycling through user ranges
         range_keys = list(self.range_ranges.keys())
+
         for r in range(rows):
             for c in range(cols):
                 idx = r*cols + c
-                if idx >= n:
-                    break
                 y0 = r*tile_h
                 x0 = c*tile_w
                 y1 = (r+1)*tile_h if r<rows-1 else self.h
                 x1 = (c+1)*tile_w if c<cols-1 else self.w
 
-                rng = self.range_ranges[range_keys[idx % len(range_keys)]]
+                # Если индекс меньше n — используем пользовательскую логику, иначе заполняем «вспомогательную» плитку
+                if idx < n:
+                    rng = self.range_ranges[range_keys[idx % len(range_keys)]]
+                else:
+                    # Для лишних ячеек: используем смешение диапазонов, чтобы не оставлять черных полей
+                    rng_a = self.range_ranges[range_keys[(idx - n) % len(range_keys)]]
+                    rng_b = self.range_ranges[range_keys[(idx - n + 1) % len(range_keys)]]
+                    # усредним диапазоны
+                    rng = (min(rng_a[0], rng_b[0]), max(rng_a[1], rng_b[1]))
+
                 # создаём мозаичное заполнение с учётом repeatability: часть пикселей будет повторяться
                 h_chunk = y1-y0
                 w_chunk = x1-x0
                 total = h_chunk*w_chunk
                 # базовый шум
                 local = np.random.randint(rng[0], rng[1]+1, size=(h_chunk, w_chunk, 3), dtype=np.uint8)
+
                 # воспроизводимость: выбираем некоторый шаблон и копируем его в random positions
                 p = max(0.0, min(1.0, self.repeatability_percent/100.0))
                 if p>0.01:
-                    # выбираем шаблон небольшой полоски
-                    pat_h = max(1, int(h_chunk * np.clip(p, 0.01, 0.5)))
-                    pat_w = max(1, int(w_chunk * np.clip(p, 0.01, 0.5)))
+                    # увеличил размер шаблона, чтобы было более заметно
+                    pat_h = max(1, int(h_chunk * np.clip(p, 0.02, 0.6)))
+                    pat_w = max(1, int(w_chunk * np.clip(p, 0.02, 0.6)))
                     pat = local[:pat_h, :pat_w].copy()
-                    # вставляем копии
-                    for _ in range(int(1 + p*5)):
+                    # вставляем копии в несколько положений
+                    for _ in range(1 + int(p*8)):
                         yy = np.random.randint(0, max(1, h_chunk-pat_h))
                         xx = np.random.randint(0, max(1, w_chunk-pat_w))
                         local[yy:yy+pat_h, xx:xx+pat_w] = pat
+
+                # Добавим видимые декоративные элементы (только штриховка/сетка/размытие) в каждой плитке
+                try:
+                    rs = np.random.RandomState(self.current_index * 1009 + idx * 97)
+                    img_tile = Image.fromarray(local, mode='RGB')
+                    draw = ImageDraw.Draw(img_tile, 'RGBA')
+
+                    # лёгкая штриховка/сетка (оставлена по запросу; эллипсы и линии удалены)
+                    if rs.randint(0,1)==0:
+                        step = max(6, min(w_chunk, h_chunk)//10)
+                        for xx in range(0, w_chunk, step):
+                            draw.line((xx, 0, xx, h_chunk), fill=(0,0,0,12))
+                        for yy in range(0, h_chunk, step):
+                            draw.line((0, yy, w_chunk, yy), fill=(0,0,0,12))
+
+                    # немного размытия
+                    blur_r = rs.uniform(0.0, 1.0)
+                    if blur_r > 0.001:
+                        img_tile = img_tile.filter(ImageFilter.GaussianBlur(radius=blur_r))
+
+                    local = np.array(img_tile, dtype=np.uint8)
+                except Exception:
+                    # если что-то пошло не так — оставим чистый шум
+                    pass
+
                 frame[y0:y1, x0:x1] = local
 
         # Иногда добавляем структурный шум, чтобы наблюдать фазовые переходы
