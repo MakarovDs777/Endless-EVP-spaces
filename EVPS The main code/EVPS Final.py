@@ -32,6 +32,10 @@ class EGFTVApp:
         # Флаг для непрерывной генерации изображения
         self.generate_continuous_flag = False
         
+        # Параметры FPS (кадров в секунду)
+        self.fps = 10  # Значение по умолчанию
+        self.frame_delay = 100  # Задержка в миллисекундах (1000/fps)
+        
         # Устанавливаем начальный размер главного окна
         self.root.geometry(f"{self.window_width}x{self.window_height}")
         
@@ -509,7 +513,20 @@ class EGFTVApp:
         self.wave_canvas = tk.Canvas(self.wave_window, width=wave_width, height=wave_height, bg='black')
         self.wave_canvas.pack(padx=8, pady=8)
         
-        # Кнопки управления
+        # Фрейм для управления FPS
+        fps_frame = tk.Frame(self.wave_window)
+        fps_frame.pack(pady=(0, 8))
+        
+        # Кнопка FPS с полем ввода
+        tk.Label(fps_frame, text='FPS:').pack(side=tk.LEFT, padx=(0, 5))
+        self.entry_fps = tk.Entry(fps_frame, width=5)
+        self.entry_fps.pack(side=tk.LEFT, padx=2)
+        self.entry_fps.insert(0, str(self.fps))
+        
+        btn_apply_fps = tk.Button(fps_frame, text='Применить FPS', command=self.apply_fps)
+        btn_apply_fps.pack(side=tk.LEFT, padx=5)
+        
+        # Фрейм для кнопок управления
         ctrl_frame = tk.Frame(self.wave_window)
         ctrl_frame.pack(pady=(0, 8))
         
@@ -521,6 +538,35 @@ class EGFTVApp:
         
         # Сразу запускаем непрерывную генерацию
         self.start_continuous_generation()
+    
+    def apply_fps(self):
+        """Применяет настройки FPS"""
+        try:
+            new_fps = int(self.entry_fps.get())
+            
+            # Проверка на допустимые значения
+            if new_fps < 1:
+                new_fps = 1
+                self.entry_fps.delete(0, tk.END)
+                self.entry_fps.insert(0, str(new_fps))
+            elif new_fps > 60:
+                new_fps = 60
+                self.entry_fps.delete(0, tk.END)
+                self.entry_fps.insert(0, str(new_fps))
+            
+            # Применяем новые настройки
+            self.fps = new_fps
+            self.frame_delay = int(1000 / new_fps)  # Конвертируем FPS в миллисекунды
+            
+            print(f"FPS изменен на: {new_fps} (задержка: {self.frame_delay} мс)")
+            
+            # Если генерация активна, перезапускаем с новыми параметрами
+            if self.generate_continuous_flag:
+                self.stop_continuous_generation()
+                self.start_continuous_generation()
+                
+        except ValueError:
+            print("Ошибка: введите корректное числовое значение для FPS")
     
     def start_continuous_generation(self):
         """Запускает непрерывную генерацию изображения"""
@@ -550,7 +596,7 @@ class EGFTVApp:
     def schedule_next_generation(self):
         """Планирует следующую генерацию изображения"""
         if self.wave_window and tk.Toplevel.winfo_exists(self.wave_window):
-            self.wave_window.after(100, self.update_continuous_frame)  # 10 FPS (100 мс)
+            self.wave_window.after(self.frame_delay, self.update_continuous_frame)
         else:
             self.generate_continuous_flag = False
     
